@@ -42,6 +42,7 @@ HEADERS = {
 
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 KNOWN_IDS_FILE = "known_ids.json"
+ERROR_STATE_FILE = "error_state.json"
 LISTING_BASE_URL = "https://trouverunlogement.lescrous.fr/tools/42/search"
 
 
@@ -84,7 +85,22 @@ def fetch_listings():
     return items
 
 
-# ── Stockage ────────────────────────────────────────────────────
+# ── Gestion état d'erreur ───────────────────────────────────────
+
+def load_error_state():
+    try:
+        with open(ERROR_STATE_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"in_error": False, "error_type": None}
+
+
+def save_error_state(state):
+    with open(ERROR_STATE_FILE, "w") as f:
+        json.dump(state, f)
+
+
+# ── Stockage logements ──────────────────────────────────────────
 
 def load_known_ids():
     try:
@@ -160,6 +176,24 @@ def send_discord_error(message):
     print(f"  Alerte erreur envoyee sur Discord : {message}")
 
 
+def send_discord_recovered(error_type):
+    if error_type == "session":
+        title = "Session Crous retablie !"
+        description = "La connexion au site Crous fonctionne a nouveau normalement."
+    else:
+        title = "Site Crous de retour !"
+        description = "Le site fonctionne a nouveau normalement. La surveillance reprend."
+
+    embed = {
+        "title": title,
+        "description": description,
+        "color": 0x2ECC71,
+        "footer": {"text": "Mon Logement Crous - Surveillance automatique"},
+    }
+    _post_to_discord({"embeds": [embed]})
+    print("  Notification de retour a la normale envoyee sur Discord.")
+
+
 def _post_to_discord(payload):
     resp = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
     resp.raise_for_status()
@@ -170,19 +204,38 @@ def _post_to_discord(payload):
 def main():
     print("Verification des annonces Crous Paris...")
 
+    error_state = load_error_state()
+
+    # 1. Recuperation des annonces
     try:
         listings = fetch_listings()
+
     except SessionExpiredError as e:
         print(f"  Session expiree : {e}")
-        send_discord_session_expired()
+        if not error_state["in_error"]:
+            send_discord_session_expired()
+            save_error_state({"in_error": True, "error_type": "session"})
+        else:
+            print("  Alerte deja envoyee, silence jusqu'au retour.")
         sys.exit(1)
+
     except RuntimeError as e:
         print(f"  Erreur : {e}")
-        send_discord_error(str(e))
+        if not error_state["in_error"]:
+            send_discord_error(str(e))
+            save_error_state({"in_error": True, "error_type": "error"})
+        else:
+            print("  Alerte deja envoyee, silence jusqu'au retour.")
         sys.exit(1)
+
+    # 2. Si on etait en erreur, notifier le retour a la normale
+    if error_state["in_error"]:
+        send_discord_recovered(error_state["error_type"])
+        save_error_state({"in_error": False, "error_type": None})
 
     print(f"  {len(listings)} annonce(s) disponible(s) en ce moment.")
 
+    # 3. Comparaison avec la passe precedente
     current_ids = {str(l["id"]) for l in listings}
     known_ids   = load_known_ids()
     new_ids     = current_ids - known_ids
@@ -195,6 +248,7 @@ def main():
     else:
         print("  Aucun nouveau logement.")
 
+    # 4. Sauvegarde
     save_known_ids(current_ids)
     print("  Etat sauvegarde.")
 
