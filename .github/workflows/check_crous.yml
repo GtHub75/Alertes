@@ -34,6 +34,6 @@ jobs:
       - name: Sauvegarder l'état
         run: |
           git config user.email "crous-bot@github-actions"
-          git config user.name "Crous Bot"
+          git config user.name "SCP Bot"
           git add known_ids.json error_state.json
           git diff --cached --quiet || git commit -m "chore: mise à jour état" && git push
