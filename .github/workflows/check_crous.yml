@@ -1,4 +1,4 @@
-name: Surveillance Crous Paris
+name: SCP
 
 on:
   schedule:
