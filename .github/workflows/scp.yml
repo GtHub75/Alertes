@@ -2,7 +2,7 @@ name: SCP
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Toutes les 5 min, 24h/24 (fiabilise par cron-job.org)
+    - cron: '*/5 * * * *'  # Fiabilise par cron-job.org (1 min)
   workflow_dispatch:         # Permet aussi de lancer manuellement depuis GitHub
 
 jobs:
@@ -29,6 +29,7 @@ jobs:
           CROUS_PHPSESSID: ${{ secrets.CROUS_PHPSESSID }}
           CROUS_QPID: ${{ secrets.CROUS_QPID }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PRIORITY_KEYWORDS: ${{ secrets.PRIORITY_KEYWORDS }}
         run: python scp.py
 
       - name: Sauvegarder l'état
@@ -36,4 +37,4 @@ jobs:
           git config user.email "crous-bot@github-actions"
           git config user.name "SCP Bot"
           git add known_ids.json error_state.json
-          git diff --cached --quiet || git commit -m "chore: mise à jour état" && git push
+          git diff --cached --quiet || (git pull --rebase && git commit -m "chore: mise à jour état" && git push)
