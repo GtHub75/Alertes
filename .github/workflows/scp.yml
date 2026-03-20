@@ -36,8 +36,8 @@ jobs:
         run: |
           git config user.email "crous-bot@github-actions"
           git config user.name "SCP Bot"
-          git stash
+          git stash || true
           git pull --rebase
-          git stash pop
+          git stash pop || true
           git add known_ids.json error_state.json
           git diff --cached --quiet || (git commit -m "chore: mise à jour état" && git push)
