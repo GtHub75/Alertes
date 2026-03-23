@@ -1,48 +1,67 @@
 name: SCP
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'  # GitHub cron fallback
-  workflow_dispatch:       # Permet lancement manuel
+schedule:
+- cron: '*/5 * * * *'  # GitHub cron fallback
+workflow_dispatch:
 
 jobs:
-  check-listings:
-    runs-on: ubuntu-latest
-    concurrency:
-      group: crous-check
-      cancel-in-progress: false
+check-listings:
+runs-on: ubuntu-latest
+
+```
+concurrency:
+  group: crous-check
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+steps:
+  - name: Checkout du dépôt
+    uses: actions/checkout@v4
+    with:
+      token: ${{ secrets.GITHUB_TOKEN }}
+
+  - name: Setup Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: '3.12'
+
+  - name: Installer les dépendances
+    run: pip install requests
+
+  - name: Vérifier les nouvelles annonces
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    steps:
-      - name: Checkout du dépôt
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      CROUS_PHPSESSID: ${{ secrets.CROUS_PHPSESSID }}
+      CROUS_QPID: ${{ secrets.CROUS_QPID }}
+      CROUS_HAPROXYID: ${{ secrets.CROUS_HAPROXYID }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      PRIORITY_KEYWORDS: ${{ secrets.PRIORITY_KEYWORDS }}
+    run: python scp.py
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+  - name: Sauvegarder l'état
+    if: always()
+    run: |
+      git config user.email "crous-bot@github-actions"
+      git config user.name "SCP Bot"
 
-      - name: Installer les dépendances
-        run: pip install requests
+      # Assure que les fichiers existent
+      [ -f known_ids.json ] || echo '[]' > known_ids.json
+      [ -f error_state.json ] || echo '{"in_error": false, "error_type": null}' > error_state.json
 
-      - name: Vérifier les nouvelles annonces
-        env:
-          CROUS_PHPSESSID: ${{ secrets.CROUS_PHPSESSID }}
-          CROUS_QPID: ${{ secrets.CROUS_QPID }}
-          CROUS_HAPROXYID: ${{ secrets.CROUS_HAPROXYID }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          PRIORITY_KEYWORDS: ${{ secrets.PRIORITY_KEYWORDS }}
-        run: python scp.py
+      # Ajouter les fichiers modifiés
+      git add known_ids.json error_state.json
 
-      - name: Sauvegarder l'état
-        if: always()
-        run: |
-          git config user.email "crous-bot@github-actions"
-          git config user.name "SCP Bot"
-          [ -f known_ids.json ] || echo '[]' > known_ids.json
-          [ -f error_state.json ] || echo '{"in_error": false, "error_type": null}' > error_state.json
-          git pull --rebase origin ${{ github.ref_name }}
-          git add known_ids.json error_state.json
-          git diff --cached --quiet || (git commit -m "chore: mise à jour état" && git push)
+      # Commit uniquement si changements
+      git diff --cached --quiet || git commit -m "chore: mise à jour état"
+
+      # Pull APRÈS commit (corrige ton erreur)
+      git pull --rebase origin ${{ github.ref_name }} || {
+        echo "Rebase failed, fallback..."
+        git pull --no-rebase origin ${{ github.ref_name }}
+      }
+
+      # Push sans faire échouer le job si rien à pousser
+      git push || echo "Nothing to push"
+```
