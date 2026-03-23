@@ -41,6 +41,8 @@ jobs:
         run: |
           git config user.email "crous-bot@github-actions"
           git config user.name "SCP Bot"
+          [ -f known_ids.json ] || echo '[]' > known_ids.json
+          [ -f error_state.json ] || echo '{"in_error": false, "error_type": null}' > error_state.json
           git pull --rebase origin ${{ github.ref_name }}
           git add known_ids.json error_state.json
           git diff --cached --quiet || (git commit -m "chore: mise à jour état" && git push)
