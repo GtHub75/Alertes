@@ -31,14 +31,16 @@ jobs:
         env:
           CROUS_PHPSESSID: ${{ secrets.CROUS_PHPSESSID }}
           CROUS_QPID: ${{ secrets.CROUS_QPID }}
+          CROUS_HAPROXYID: ${{ secrets.CROUS_HAPROXYID }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           PRIORITY_KEYWORDS: ${{ secrets.PRIORITY_KEYWORDS }}
         run: python scp.py
 
       - name: Sauvegarder l'état
+        if: always()   # Tourne aussi en cas d'échec pour sauvegarder error_state.json
         run: |
           git config user.email "crous-bot@github-actions"
           git config user.name "SCP Bot"
-          git pull --rebase origin main
+          git pull --rebase origin ${{ github.ref_name }}
           git add known_ids.json error_state.json
           git diff --cached --quiet || (git commit -m "chore: mise à jour état" && git push)
