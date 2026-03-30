@@ -8,14 +8,11 @@ on:
 jobs:
   check-listings:
     runs-on: ubuntu-latest
-
     concurrency:
       group: crous-check
-      cancel-in-progress: true   # 🔥 Permet de ne pas empiler les jobs
-
+      cancel-in-progress: false
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
     steps:
       - name: Checkout du dépôt
         uses: actions/checkout@v4
@@ -44,15 +41,12 @@ jobs:
         run: |
           git config user.email "crous-bot@github-actions"
           git config user.name "SCP Bot"
-
           [ -f known_ids.json ] || echo '[]' > known_ids.json
           [ -f error_state.json ] || echo '{"in_error": false, "error_type": null}' > error_state.json
-
           git add known_ids.json error_state.json
           git diff --cached --quiet || git commit -m "chore: mise à jour état"
-
-          # 🔥 Fix Git pour éviter les conflits de rebase
-          git fetch origin
-          git reset --hard origin/${{ github.ref_name }}
-
+          git pull --rebase origin ${{ github.ref_name }} || {
+            echo "Rebase failed, fallback..."
+            git pull --no-rebase origin ${{ github.ref_name }}
+          }
           git push || echo "Nothing to push"
