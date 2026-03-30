@@ -11,7 +11,7 @@ jobs:
 
     concurrency:
       group: crous-check
-      cancel-in-progress: true
+      cancel-in-progress: true   # 🔥 Permet de ne pas empiler les jobs
 
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -51,9 +51,8 @@ jobs:
           git add known_ids.json error_state.json
           git diff --cached --quiet || git commit -m "chore: mise à jour état"
 
-          git pull --rebase origin ${{ github.ref_name }} || {
-            echo "Rebase failed, fallback..."
-            git pull --no-rebase origin ${{ github.ref_name }}
-          }
+          # 🔥 Fix Git pour éviter les conflits de rebase
+          git fetch origin
+          git reset --hard origin/${{ github.ref_name }}
 
           git push || echo "Nothing to push"
