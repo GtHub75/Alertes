@@ -1,8 +1,8 @@
-name: SCP
+name: SCP - Priorité
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/5 * * * *'   # toutes les 5 minutes
   workflow_dispatch:
 
 jobs:
@@ -13,6 +13,7 @@ jobs:
       cancel-in-progress: false
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     steps:
       - name: Checkout du dépôt
         uses: actions/checkout@v4
@@ -27,7 +28,7 @@ jobs:
       - name: Installer les dépendances
         run: pip install requests
 
-      - name: Vérifier les nouvelles annonces
+      - name: Vérifier les nouvelles annonces prioritaires
         env:
           CROUS_PHPSESSID: ${{ secrets.CROUS_PHPSESSID }}
           CROUS_QPID: ${{ secrets.CROUS_QPID }}
